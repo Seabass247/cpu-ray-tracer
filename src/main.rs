@@ -1,28 +1,51 @@
-use image::{ImageBuffer, RgbImage};
-use nalgebra::Vec3;
 mod ray;
+
+use image::{ImageBuffer, RgbImage};
+use nalgebra::{Dot, Norm, Vec3};
+use ray::{Ray, Point3};
 
 type Color = Vec3<f64>;
 type PixelBuf = Vec<u8>;
 
+const IMAGE_WIDTH: u32 = 960;
+const ASPECT_RATIO: f64 = 16.0 / 9.0;
+const FOCAL_LENGTH: f64 = 0.8;
+
 fn main() {
-    const IMAGE_WIDTH: u32 = 256;
-    const IMAGE_HEIGHT: u32 = 256;
+    let aspect_ratio: f64 = ASPECT_RATIO;
+    let image_width = IMAGE_WIDTH;
+    let image_height = (image_width as f64 / aspect_ratio) as u32;
+
+    // Camera
+
+    let viewport_height: f64 = 2.0;
+    let viewport_width = aspect_ratio * viewport_height;
+    let focal_length: f64 = FOCAL_LENGTH;
+
+    let origin = Vec3::new(0.0, 0.0, 0.0);
+    let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
+    let vertical = Vec3::new(0.0, viewport_height, 0.0);
+    let lower_left_corner = origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, focal_length);
 
     let mut pixel_buf: Vec<u8> = Vec::new();
 
-    for j in (0..IMAGE_HEIGHT).rev() {
+    for j in (0..image_height).rev() {
         println!("\rScanlines remaining: {}", j);
-        for i in 0..IMAGE_WIDTH {
-            let r = i as f64 / (IMAGE_WIDTH - 1) as f64;
-            let g = j as f64 / (IMAGE_HEIGHT - 1) as f64;
-            let b = 0.25;
+        for i in 0..image_width {
+            let u = i as f64 / (image_width - 1) as f64;
+            let v = j as f64 / (image_height - 1) as f64;
 
-            write_color(&mut pixel_buf, Vec3::new(r , g, b));
+            let ray: Ray = Ray { 
+                origin,
+                direction: lower_left_corner + u * horizontal + v * vertical - origin
+            };
+
+            let pixel_color: Color = ray_color(ray);
+            write_color(&mut pixel_buf, pixel_color);
         }
     }
 
-    let buffer: RgbImage = ImageBuffer::from_raw(IMAGE_WIDTH, IMAGE_HEIGHT, pixel_buf)
+    let buffer: RgbImage = ImageBuffer::from_raw(image_width, image_height, pixel_buf)
         .expect("Could not create image from buffer");
     buffer
         .save("output.png")
@@ -37,4 +60,31 @@ fn write_color(pixel_buf: &mut PixelBuf, color: Color) {
     let ib = (255.99 * color.z) as u8;
     let mut pixel = vec![ir, ig, ib];
     pixel_buf.append(&mut pixel);
+}
+
+fn ray_color(ray: Ray) -> Color {
+    if hit_sphere(Point3::new(0.0,0.0,-1.0), 0.5, &ray) {
+        return Color::new(0.0, 0.5, 1.0);
+    }
+
+    if hit_sphere(Point3::new(1.0,0.0,-1.0), 0.5, &ray) {
+        return Color::new(0.0, 1.0, 0.0);
+    }
+
+    if hit_sphere(Point3::new(-1.0,0.0,-1.0), 0.5, &ray) {
+        return Color::new(1.0, 0.5, 0.0);
+    }
+
+    let unit_direction = ray.direction.normalize();
+    let t = 0.5 * (unit_direction.y + 1.0);
+    return (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0);
+}
+
+fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> bool {
+    let oc = ray.origin - center;
+    let a = ray.direction.dot(&ray.direction);
+    let b = 2.0 * oc.dot(&ray.direction);
+    let c = oc.dot(&oc) - radius * radius;
+    let discriminant = b * b - 4.0 * a * c;
+    return discriminant > 0.0;
 }

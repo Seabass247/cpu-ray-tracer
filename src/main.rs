@@ -1,4 +1,9 @@
 use image::{ImageBuffer, RgbImage};
+use nalgebra::Vec3;
+mod ray;
+
+type Color = Vec3<f64>;
+type PixelBuf = Vec<u8>;
 
 fn main() {
     const IMAGE_WIDTH: u32 = 256;
@@ -13,12 +18,7 @@ fn main() {
             let g = j as f64 / (IMAGE_HEIGHT - 1) as f64;
             let b = 0.25;
 
-            let ir = (255.99 * r) as u8;
-            let ig = (255.99 * g) as u8;
-            let ib = (255.99 * b) as u8;
-
-            let mut pixel = vec![ir, ig, ib];
-            pixel_buf.append(&mut pixel);
+            write_color(&mut pixel_buf, Vec3::new(r , g, b));
         }
     }
 
@@ -29,4 +29,12 @@ fn main() {
         .expect("Could not save image to file");
 
     println!("Done.")
+}
+
+fn write_color(pixel_buf: &mut PixelBuf, color: Color) {
+    let ir = (255.99 * color.x) as u8;
+    let ig = (255.99 * color.y) as u8;
+    let ib = (255.99 * color.z) as u8;
+    let mut pixel = vec![ir, ig, ib];
+    pixel_buf.append(&mut pixel);
 }
